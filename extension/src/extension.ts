@@ -274,7 +274,7 @@ export class Extension extends Disposable implements IExtension {
     registerWalkthroughCommands(
       this.internalCommands,
       context.extension.packageJSON.id,
-      context.extension.packageJSON.contributes.walkthroughs[0].id
+      context.extension.packageJSON.contributes.walkthrough[0].id
     )
 
     this.dispose.track(

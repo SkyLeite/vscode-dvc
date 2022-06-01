@@ -1297,7 +1297,7 @@
         "contents": "No Plots to Display."
       }
     ],
-    "walkthroughs": [
+    "walkthrough": [
       {
         "id": "welcome",
         "title": "Get Started with DVC",
