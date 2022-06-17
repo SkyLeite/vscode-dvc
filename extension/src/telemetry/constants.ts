@@ -36,7 +36,13 @@ export const EventName = Object.assign(
       'views.experimentTable.toggleStatus',
     VIEWS_EXPERIMENTS_TABLE_FOCUS_CHANGED:
       'views.experimentsTable.focusChanged',
+    VIEWS_EXPERIMENTS_TABLE_FOCUS_FILTERS_TREE:
+      'views.experimentsTable.focusFiltersTree',
+    VIEWS_EXPERIMENTS_TABLE_FOCUS_SORTS_TREE:
+      'views.experimentsTable.focusSortsTree',
     VIEWS_EXPERIMENTS_TABLE_HIDE_COLUMN: 'views.experimentsTable.columnHidden',
+    VIEWS_EXPERIMENTS_TABLE_OPEN_PARAMS_FILE:
+      'views.experimentsTable.paramsFileOpened',
     VIEWS_EXPERIMENTS_TABLE_REMOVE_COLUMN_SORT:
       'views.experimentsTable.columnSortRemoved',
     VIEWS_EXPERIMENTS_TABLE_RESIZE_COLUMN:
@@ -52,7 +58,6 @@ export const EventName = Object.assign(
     VIEWS_PLOTS_FOCUS_CHANGED: 'views.plots.focusChanged',
     VIEWS_PLOTS_MANUAL_REFRESH: 'views.plots.manualRefresh',
     VIEWS_PLOTS_METRICS_SELECTED: 'views.plots.metricsSelected',
-    VIEWS_PLOTS_RENAME_SECTION: 'views.plots.sectionRenamed',
     VIEWS_PLOTS_REVISIONS_REORDERED: 'views.plots.revisionsReordered',
     VIEWS_PLOTS_SECTION_RESIZED: 'views.plots.sectionResized',
     VIEWS_PLOTS_SECTION_TOGGLE: 'views.plots.toggleSection',
@@ -141,6 +146,7 @@ export interface IEventNamePropertyMapping {
   [EventName.PLOTS_PATH_TOGGLE]: undefined
   [EventName.PLOTS_SHOW]: undefined
   [EventName.PLOTS_SELECT]: undefined
+  [EventName.PLOTS_REFRESH]: undefined
 
   [EventName.ADD_TARGET]: undefined
   [EventName.CHECKOUT_TARGET]: undefined
@@ -148,6 +154,7 @@ export interface IEventNamePropertyMapping {
   [EventName.COMMIT_TARGET]: undefined
   [EventName.COMMIT]: undefined
   [EventName.DELETE_TARGET]: undefined
+  [EventName.DISCARD_WORKSPACE_CHANGES]: undefined
   [EventName.INIT]: undefined
   [EventName.MOVE_TARGETS]: undefined
   [EventName.PULL_TARGET]: undefined
@@ -156,7 +163,6 @@ export interface IEventNamePropertyMapping {
   [EventName.PUSH]: undefined
   [EventName.REMOVE_TARGET]: undefined
   [EventName.RENAME_TARGET]: undefined
-  [EventName.RESET_WORKSPACE]: undefined
 
   [EventName.GIT_STAGE_ALL]: undefined
   [EventName.GIT_UNSTAGE_ALL]: undefined
@@ -183,6 +189,8 @@ export interface IEventNamePropertyMapping {
   [EventName.VIEWS_EXPERIMENTS_TABLE_EXPERIMENT_TOGGLE]: undefined
   [EventName.VIEWS_EXPERIMENTS_TABLE_CLOSED]: undefined
   [EventName.VIEWS_EXPERIMENTS_TABLE_COLUMNS_REORDERED]: undefined
+  [EventName.VIEWS_EXPERIMENTS_TABLE_FOCUS_FILTERS_TREE]: undefined
+  [EventName.VIEWS_EXPERIMENTS_TABLE_FOCUS_SORTS_TREE]: undefined
   [EventName.VIEWS_EXPERIMENTS_TABLE_RESIZE_COLUMN]: {
     width: number
   }
@@ -196,13 +204,15 @@ export interface IEventNamePropertyMapping {
     path: string
   }
   [EventName.VIEWS_EXPERIMENTS_TABLE_SELECT_COLUMNS]: undefined
+  [EventName.VIEWS_EXPERIMENTS_TABLE_OPEN_PARAMS_FILE]: {
+    path: string
+  }
 
   [EventName.VIEWS_PLOTS_CLOSED]: undefined
   [EventName.VIEWS_PLOTS_CREATED]: undefined
   [EventName.VIEWS_PLOTS_FOCUS_CHANGED]: WebviewFocusChangedProperties
-  [EventName.VIEWS_PLOTS_MANUAL_REFRESH]: undefined
+  [EventName.VIEWS_PLOTS_MANUAL_REFRESH]: { revisions: number }
   [EventName.VIEWS_PLOTS_METRICS_SELECTED]: undefined
-  [EventName.VIEWS_PLOTS_RENAME_SECTION]: { section: Section }
   [EventName.VIEWS_PLOTS_REVISIONS_REORDERED]: undefined
   [EventName.VIEWS_PLOTS_SECTION_RESIZED]: { section: Section; size: PlotSize }
   [EventName.VIEWS_PLOTS_SECTION_TOGGLE]: Partial<SectionCollapsed>

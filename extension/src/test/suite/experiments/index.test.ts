@@ -8,7 +8,8 @@ import {
   commands,
   workspace,
   Uri,
-  QuickPickItem
+  QuickPickItem,
+  ViewColumn
 } from 'vscode'
 import { buildExperiments } from './util'
 import { Disposable } from '../../../extension'
@@ -45,7 +46,7 @@ import {
 } from '../../../experiments/model/filterBy'
 import * as FilterQuickPicks from '../../../experiments/model/filterBy/quickPick'
 import * as SortQuickPicks from '../../../experiments/model/sortBy/quickPick'
-import { joinColumnPath } from '../../../experiments/columns/paths'
+import { buildMetricOrParamPath } from '../../../experiments/columns/paths'
 import { BaseWebview } from '../../../webview'
 import { ColumnsModel } from '../../../experiments/columns/model'
 import { MessageFromWebviewType } from '../../../webview/contract'
@@ -59,6 +60,7 @@ import * as Telemetry from '../../../telemetry'
 import { EventName } from '../../../telemetry/constants'
 import * as VscodeContext from '../../../vscode/context'
 import { Title } from '../../../vscode/title'
+import { ExperimentFlag } from '../../../cli/constants'
 
 suite('Experiments Test Suite', () => {
   const disposable = Disposable.fn()
@@ -124,8 +126,11 @@ suite('Experiments Test Suite', () => {
         columnOrder: [],
         columnWidths: {},
         columns: columnsFixture,
+        filteredCounts: { checkpoints: 0, experiments: 0 },
+        filters: [],
         hasCheckpoints: true,
         hasColumns: true,
+        hasRunningExperiment: true,
         rows: rowsFixture,
         sorts: []
       }
@@ -162,6 +167,30 @@ suite('Experiments Test Suite', () => {
 
       expect(windowSpy).not.to.have.been.called
     }).timeout(WEBVIEW_TEST_TIMEOUT)
+  })
+
+  describe('handleMessageFromWebview', () => {
+    const setupExperimentsAndMockCommands = () => {
+      const {
+        columnsModel,
+        experiments,
+        experimentsModel,
+        internalCommands,
+        messageSpy
+      } = buildExperiments(disposable, expShowFixture)
+      const mockExecuteCommand = stub(
+        internalCommands,
+        'executeCommand'
+      ).resolves(undefined)
+
+      return {
+        columnsModel,
+        experiments,
+        experimentsModel,
+        messageSpy,
+        mockExecuteCommand
+      }
+    }
 
     it('should handle a column reordered message from the webview', async () => {
       const { experiments } = buildExperiments(disposable, expShowFixture)
@@ -203,7 +232,7 @@ suite('Experiments Test Suite', () => {
         undefined,
         undefined
       )
-    })
+    }).timeout(WEBVIEW_TEST_TIMEOUT)
 
     it('should handle a column resized message from the webview', async () => {
       const { experiments } = buildExperiments(disposable, expShowFixture)
@@ -237,7 +266,7 @@ suite('Experiments Test Suite', () => {
         { width: mockWidth },
         undefined
       )
-    })
+    }).timeout(WEBVIEW_TEST_TIMEOUT)
 
     it('should handle a toggle experiment message from the webview', async () => {
       const { experiments } = buildExperiments(disposable, expShowFixture)
@@ -305,7 +334,7 @@ suite('Experiments Test Suite', () => {
         mockSortDefinition,
         undefined
       )
-    })
+    }).timeout(WEBVIEW_TEST_TIMEOUT)
 
     it('should handle a column sort removed from the webview', async () => {
       const { experiments } = buildExperiments(disposable, expShowFixture)
@@ -340,31 +369,7 @@ suite('Experiments Test Suite', () => {
         },
         undefined
       )
-    })
-  })
-
-  describe('handleMessageFromWebview', () => {
-    const setupExperimentsAndMockCommands = () => {
-      const {
-        columnsModel,
-        experiments,
-        experimentsModel,
-        internalCommands,
-        messageSpy
-      } = buildExperiments(disposable, expShowFixture)
-      const mockExecuteCommand = stub(
-        internalCommands,
-        'executeCommand'
-      ).resolves(undefined)
-
-      return {
-        columnsModel,
-        experiments,
-        experimentsModel,
-        messageSpy,
-        mockExecuteCommand
-      }
-    }
+    }).timeout(WEBVIEW_TEST_TIMEOUT)
 
     it('should be able to handle a message to hide a table column', async () => {
       const { experiments, columnsModel } = buildExperiments(disposable)
@@ -387,6 +392,50 @@ suite('Experiments Test Suite', () => {
         EventName.VIEWS_EXPERIMENTS_TABLE_HIDE_COLUMN,
         { path: mockColumnId },
         undefined
+      )
+    })
+
+    it('should be able to handle a message to open the source params file from a column path', async () => {
+      const { experiments } = setupExperimentsAndMockCommands()
+
+      const mockShowTextDocument = stub(window, 'showTextDocument')
+      const webview = await experiments.showWebview()
+      const mockMessageReceived = getMessageReceivedEmitter(webview)
+      const mockColumnId = 'params:params.yaml_5'
+
+      mockMessageReceived.fire({
+        payload: mockColumnId,
+        type: MessageFromWebviewType.OPEN_PARAMS_FILE_TO_THE_SIDE
+      })
+
+      expect(mockShowTextDocument).to.be.calledOnce
+      expect(mockShowTextDocument).to.be.calledWithExactly(
+        Uri.file(join(dvcDemoPath, 'params.yaml')),
+        {
+          viewColumn: ViewColumn.Beside
+        }
+      )
+    })
+
+    it('should be able to handle a message to open different params files than the default one', async () => {
+      const { experiments } = setupExperimentsAndMockCommands()
+
+      const mockShowTextDocument = stub(window, 'showTextDocument')
+      const webview = await experiments.showWebview()
+      const mockMessageReceived = getMessageReceivedEmitter(webview)
+      const mockColumnId = 'params:params_alt.json_5:nested1.nested2'
+
+      mockMessageReceived.fire({
+        payload: mockColumnId,
+        type: MessageFromWebviewType.OPEN_PARAMS_FILE_TO_THE_SIDE
+      })
+
+      expect(mockShowTextDocument).to.be.calledOnce
+      expect(mockShowTextDocument).to.be.calledWithExactly(
+        Uri.file(join(dvcDemoPath, 'params_alt.json')),
+        {
+          viewColumn: ViewColumn.Beside
+        }
       )
     })
 
@@ -502,8 +551,10 @@ suite('Experiments Test Suite', () => {
     })
 
     it("should be able to handle a message to modify an experiment's params reset and run a new experiment", async () => {
-      const { experiments, mockExecuteCommand } =
-        setupExperimentsAndMockCommands()
+      const { experiments, cliRunner } = buildExperiments(
+        disposable,
+        expShowFixture
+      )
 
       const mockModifiedParams = [
         '-S',
@@ -513,6 +564,9 @@ suite('Experiments Test Suite', () => {
       ]
 
       stub(experiments, 'pickAndModifyParams').resolves(mockModifiedParams)
+      const mockRunExperiment = stub(cliRunner, 'runExperiment').resolves(
+        undefined
+      )
 
       const webview = await experiments.showWebview()
       const mockMessageReceived = getMessageReceivedEmitter(webview)
@@ -525,10 +579,10 @@ suite('Experiments Test Suite', () => {
       })
 
       await tableChangePromise
-      expect(mockExecuteCommand).to.be.calledOnce
-      expect(mockExecuteCommand).to.be.calledWithExactly(
-        AvailableCommands.EXPERIMENT_RESET_AND_RUN,
+      expect(mockRunExperiment).to.be.calledOnce
+      expect(mockRunExperiment).to.be.calledWithExactly(
         dvcDemoPath,
+        ExperimentFlag.RESET,
         ...mockModifiedParams
       )
     })
@@ -637,13 +691,82 @@ suite('Experiments Test Suite', () => {
         columnOrder: [],
         columnWidths: {},
         columns: [],
+        filteredCounts: { checkpoints: 0, experiments: 0 },
+        filters: [],
         hasCheckpoints: true,
         hasColumns: true,
+        hasRunningExperiment: true,
         rows: rowsFixture,
         sorts: []
       }
 
       expect(messageSpy).to.be.calledWith(allColumnsUnselected)
+    })
+
+    it('should be able to handle a message to focus the sorts tree', async () => {
+      const { experiments } = buildExperiments(disposable, expShowFixture)
+
+      const webview = await experiments.showWebview()
+
+      const mockSendTelemetryEvent = stub(Telemetry, 'sendTelemetryEvent')
+      const mockMessageReceived = getMessageReceivedEmitter(webview)
+      const executeCommandStub = stub(commands, 'executeCommand')
+
+      const messageReceived = new Promise(resolve =>
+        disposable.track(mockMessageReceived.event(() => resolve(undefined)))
+      )
+
+      mockMessageReceived.fire({
+        type: MessageFromWebviewType.FOCUS_SORTS_TREE
+      })
+
+      expect(executeCommandStub).to.be.calledWith(
+        'dvc.views.experimentsSortByTree.focus'
+      )
+
+      await messageReceived
+      expect(mockSendTelemetryEvent).to.be.calledOnce
+      expect(
+        mockSendTelemetryEvent,
+        'should send a telemetry call that the sorts tree has been focused'
+      ).to.be.calledWithExactly(
+        EventName.VIEWS_EXPERIMENTS_TABLE_FOCUS_SORTS_TREE,
+        undefined,
+        undefined
+      )
+    })
+
+    it('should be able to handle a message to focus the filters tree', async () => {
+      const { experiments } = buildExperiments(disposable, expShowFixture)
+
+      const webview = await experiments.showWebview()
+
+      const mockSendTelemetryEvent = stub(Telemetry, 'sendTelemetryEvent')
+      const mockMessageReceived = getMessageReceivedEmitter(webview)
+      const executeCommandStub = stub(commands, 'executeCommand')
+
+      const messageReceived = new Promise(resolve =>
+        disposable.track(mockMessageReceived.event(() => resolve(undefined)))
+      )
+
+      mockMessageReceived.fire({
+        type: MessageFromWebviewType.FOCUS_FILTERS_TREE
+      })
+
+      expect(executeCommandStub).to.be.calledWith(
+        'dvc.views.experimentsFilterByTree.focus'
+      )
+
+      await messageReceived
+      expect(mockSendTelemetryEvent).to.be.calledOnce
+      expect(
+        mockSendTelemetryEvent,
+        'should send a telemetry call that the filters tree has been focused'
+      ).to.be.calledWithExactly(
+        EventName.VIEWS_EXPERIMENTS_TABLE_FOCUS_FILTERS_TREE,
+        undefined,
+        undefined
+      )
     })
   })
 
@@ -749,7 +872,11 @@ suite('Experiments Test Suite', () => {
       })
 
       const mockShowQuickPick = stub(window, 'showQuickPick')
-      const sortPath = joinColumnPath(ColumnType.PARAMS, 'params.yaml', 'test')
+      const sortPath = buildMetricOrParamPath(
+        ColumnType.PARAMS,
+        'params.yaml',
+        'test'
+      )
 
       mockShowQuickPick.onFirstCall().resolves({
         label: 'test',
@@ -824,35 +951,35 @@ suite('Experiments Test Suite', () => {
   describe('persisted state', () => {
     const firstSortDefinition = {
       descending: false,
-      path: joinColumnPath(ColumnType.PARAMS, 'params.yaml', 'test')
+      path: buildMetricOrParamPath(ColumnType.PARAMS, 'params.yaml', 'test')
     }
     const secondSortDefinition = {
       descending: true,
-      path: joinColumnPath(ColumnType.PARAMS, 'params.yaml', 'other')
+      path: buildMetricOrParamPath(ColumnType.PARAMS, 'params.yaml', 'other')
     }
     const sortDefinitions: SortDefinition[] = [
       firstSortDefinition,
       secondSortDefinition
     ]
 
-    const firstFilterId = joinColumnPath(
+    const firstFilterId = buildMetricOrParamPath(
       ColumnType.PARAMS,
       'params.yaml',
       'test==1'
     )
     const firstFilterDefinition = {
       operator: Operator.EQUAL,
-      path: joinColumnPath(ColumnType.PARAMS, 'params.yaml', 'test'),
+      path: buildMetricOrParamPath(ColumnType.PARAMS, 'params.yaml', 'test'),
       value: 1
     }
-    const secondFilterId = joinColumnPath(
+    const secondFilterId = buildMetricOrParamPath(
       ColumnType.PARAMS,
       'params.yaml',
       'other∈testcontains'
     )
     const secondFilterDefinition = {
       operator: Operator.CONTAINS,
-      path: joinColumnPath(ColumnType.PARAMS, 'params.yaml', 'other'),
+      path: buildMetricOrParamPath(ColumnType.PARAMS, 'params.yaml', 'other'),
       value: 'testcontains'
     }
     const firstFilterMapEntry: [string, FilterDefinition] = [
@@ -1078,13 +1205,41 @@ suite('Experiments Test Suite', () => {
         )
       })
 
-    it('should set the appropriate context value when a params file is opened', async () => {
+    it('should set the appropriate context value when a params file is open in the active editor/closed', async () => {
+      const paramsFile = Uri.file(join(dvcDemoPath, 'params.yaml'))
+      await window.showTextDocument(paramsFile)
+
+      const mockContext: { [key: string]: unknown } = {
+        'dvc.params.fileActive': false
+      }
+
+      const mockSetContextValue = stub(VscodeContext, 'setContextValue')
+      mockSetContextValue.callsFake((key: string, value: unknown) => {
+        mockContext[key] = value
+        return Promise.resolve(undefined)
+      })
+
       const { experiments } = buildExperiments(disposable)
       await experiments.isReady()
 
-      const paramsFile = Uri.file(join(dvcDemoPath, 'params.yaml'))
+      expect(
+        mockContext['dvc.params.fileActive'],
+        'should set dvc.params.fileActive to true when a params file is open and the extension starts'
+      ).to.be.true
 
-      const setContextValueSpy = spy(VscodeContext, 'setContextValue')
+      mockSetContextValue.resetHistory()
+
+      const startupEditorClosed = getActiveEditorUpdatedEvent()
+
+      await closeAllEditors()
+      await startupEditorClosed
+
+      expect(
+        mockContext['dvc.params.fileActive'],
+        'should set dvc.params.fileActive to false when the params file in the active editor is closed'
+      ).to.be.false
+
+      mockSetContextValue.resetHistory()
 
       const activeEditorUpdated = getActiveEditorUpdatedEvent()
 
@@ -1093,50 +1248,18 @@ suite('Experiments Test Suite', () => {
 
       const activeEditorClosed = getActiveEditorUpdatedEvent()
 
-      expect(setContextValueSpy).to.be.calledOnce
-      expect(setContextValueSpy).to.be.calledWithExactly(
-        'dvc.params.fileActive',
-        true
-      )
-
-      setContextValueSpy.resetHistory()
+      expect(
+        mockContext['dvc.params.fileActive'],
+        'should set dvc.params.fileActive to true when a params file is in the active editor'
+      ).to.be.true
 
       await closeAllEditors()
       await activeEditorClosed
 
-      expect(setContextValueSpy).to.be.calledOnce
-      expect(setContextValueSpy).to.be.calledWithExactly(
-        'dvc.params.fileActive',
-        false
-      )
-    })
-
-    it('should set the appropriate context value when a params file is open and the extension starts', async () => {
-      const paramsFile = Uri.file(join(dvcDemoPath, 'params.yaml'))
-      await window.showTextDocument(paramsFile)
-
-      const setContextValueSpy = spy(VscodeContext, 'setContextValue')
-
-      const { experiments } = buildExperiments(disposable)
-      await experiments.isReady()
-
-      expect(setContextValueSpy).to.be.calledOnce
-      expect(setContextValueSpy).to.be.calledWithExactly(
-        'dvc.params.fileActive',
-        true
-      )
-
-      setContextValueSpy.resetHistory()
-      const activeEditorClosed = getActiveEditorUpdatedEvent()
-
-      await closeAllEditors()
-      await activeEditorClosed
-
-      expect(setContextValueSpy).to.be.calledOnce
-      expect(setContextValueSpy).to.be.calledWithExactly(
-        'dvc.params.fileActive',
-        false
-      )
+      expect(
+        mockContext['dvc.params.fileActive'],
+        'should set dvc.params.fileActive to false when the params file in the active editor is closed again'
+      ).to.be.false
     })
 
     it('should not set a context value when a non-params file is open and the extension starts', async () => {

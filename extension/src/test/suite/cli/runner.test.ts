@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, it, suite } from 'mocha'
 import { expect } from 'chai'
 import { restore, spy, stub } from 'sinon'
-import { window, commands, Event, EventEmitter } from 'vscode'
+import { window, Event, EventEmitter } from 'vscode'
 import { Disposable, Disposer } from '../../../extension'
 import { Config } from '../../../config'
 import { CliRunner } from '../../../cli/runner'
@@ -38,8 +38,6 @@ suite('CLI Runner Test Suite', () => {
       const cliRunner = disposable.track(new CliRunner({} as Config, 'sleep'))
       const cwd = __dirname
 
-      const executeCommandSpy = spy(commands, 'executeCommand')
-
       const onDidCompleteProcess = (): Promise<void> =>
         new Promise(resolve =>
           disposable.track(cliRunner.onDidCompleteProcess(() => resolve()))
@@ -50,11 +48,6 @@ suite('CLI Runner Test Suite', () => {
       const completed = onDidCompleteProcess()
 
       expect(cliRunner.isExperimentRunning()).to.be.true
-      expect(executeCommandSpy).to.be.calledWith(
-        'setContext',
-        'dvc.runner.running',
-        true
-      )
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const closeSpy = spy((cliRunner as any).pseudoTerminal, 'close')
@@ -65,11 +58,6 @@ suite('CLI Runner Test Suite', () => {
       await completed
 
       expect(cliRunner.isExperimentRunning()).to.be.false
-      expect(executeCommandSpy).to.be.calledWith(
-        'setContext',
-        'dvc.runner.running',
-        false
-      )
     }).timeout(WEBVIEW_TEST_TIMEOUT)
 
     it('should be able to execute a command and provide the correct events in the correct order', async () => {
@@ -129,7 +117,7 @@ suite('CLI Runner Test Suite', () => {
 
       expect(output.includes(text)).to.be.true
       return completed
-    })
+    }).timeout(WEBVIEW_TEST_TIMEOUT)
 
     it('should send an error event if the command fails with an exit code and stderr', async () => {
       const mockSendTelemetryEvent = stub(Telemetry, 'sendErrorTelemetryEvent')
@@ -161,6 +149,6 @@ suite('CLI Runner Test Suite', () => {
       expect(error.message).to.have.length.greaterThan(0)
       expect(command).to.equal('sleep 1 && then die')
       expect(exitCode).to.be.greaterThan(0)
-    }).timeout(6000)
+    }).timeout(WEBVIEW_TEST_TIMEOUT)
   })
 })

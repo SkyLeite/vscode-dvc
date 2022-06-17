@@ -57,6 +57,7 @@ export enum RegisteredCommands {
   PLOTS_PATH_TOGGLE = 'dvc.views.plotsPathsTree.toggleStatus',
   PLOTS_SHOW = 'dvc.showPlots',
   PLOTS_SELECT = 'dvc.views.plotsPathsTree.selectPlots',
+  PLOTS_REFRESH = 'dvc.views.plotsPathsTree.refreshPlots',
 
   EXTENSION_CHECK_CLI_COMPATIBLE = 'dvc.checkCLICompatible',
   EXTENSION_GET_STARTED = 'dvc.getStarted',
@@ -67,7 +68,7 @@ export enum RegisteredCommands {
   DELETE_TARGET = 'dvc.deleteTarget',
   MOVE_TARGETS = 'dvc.moveTargets',
 
-  RESET_WORKSPACE = 'dvc.resetWorkspace',
+  DISCARD_WORKSPACE_CHANGES = 'dvc.discardWorkspaceChanges',
 
   TRACKED_EXPLORER_OPEN_FILE = 'dvc.views.trackedExplorerTree.openFile',
   TRACKED_EXPLORER_COMPARE_SELECTED = 'dvc.compareSelected',

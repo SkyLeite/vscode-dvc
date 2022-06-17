@@ -8,8 +8,10 @@
   "editor.tabSize": 2,
   "typescript.updateImportsOnFileMove.enabled": "prompt",
   "cSpell.words": [
+    "appdirs",
     "camelcase",
     "chokidar",
+    "Codespaces",
     "conda",
     "datapoint",
     "datapoints",

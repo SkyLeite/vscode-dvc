@@ -24,7 +24,7 @@ import {
   Row,
   TableData
 } from 'dvc/src/experiments/webview/contract'
-import { joinColumnPath } from 'dvc/src/experiments/columns/paths'
+import { buildMetricOrParamPath } from 'dvc/src/experiments/columns/paths'
 import { App } from './App'
 import { useIsFullyContained } from './overflowHoverTooltip/useIsFullyContained'
 import styles from './table/styles.module.scss'
@@ -213,7 +213,7 @@ describe('App', () => {
         {
           ...commonColumnFields,
           id: 'D',
-          name: 'D',
+          label: 'D',
           path: 'params:D'
         } as Column
       ]
@@ -464,7 +464,7 @@ describe('App', () => {
     })
 
     const testParamName = 'test_param_with_long_name'
-    const testParamPath = joinColumnPath(
+    const testParamPath = buildMetricOrParamPath(
       ColumnType.PARAMS,
       'params.yaml',
       testParamName
@@ -477,35 +477,42 @@ describe('App', () => {
       columns: [
         {
           hasChildren: true,
-          name: 'summary.json',
-          parentPath: joinColumnPath(ColumnType.METRICS),
-          path: joinColumnPath(ColumnType.METRICS, 'summary.json'),
+          label: 'summary.json',
+          parentPath: buildMetricOrParamPath(ColumnType.METRICS),
+          path: buildMetricOrParamPath(ColumnType.METRICS, 'summary.json'),
           type: ColumnType.METRICS
         },
         {
           hasChildren: false,
+          label: 'loss',
           maxNumber: testMetricNumberValue,
           maxStringLength: 18,
           minNumber: testMetricNumberValue,
-          name: 'loss',
-          parentPath: joinColumnPath(ColumnType.METRICS, 'summary.json'),
-          path: joinColumnPath(ColumnType.METRICS, 'summary.json', 'loss'),
+          parentPath: buildMetricOrParamPath(
+            ColumnType.METRICS,
+            'summary.json'
+          ),
+          path: buildMetricOrParamPath(
+            ColumnType.METRICS,
+            'summary.json',
+            'loss'
+          ),
           pathArray: [ColumnType.METRICS, 'summary.json', 'loss'],
           type: ColumnType.METRICS,
           types: ['number']
         },
         {
           hasChildren: true,
-          name: 'params.yaml',
+          label: 'params.yaml',
           parentPath: ColumnType.PARAMS,
-          path: joinColumnPath(ColumnType.PARAMS, 'params.yaml'),
+          path: buildMetricOrParamPath(ColumnType.PARAMS, 'params.yaml'),
           type: ColumnType.PARAMS
         },
         {
           hasChildren: false,
+          label: testParamName,
           maxStringLength: 10,
-          name: testParamName,
-          parentPath: joinColumnPath(ColumnType.PARAMS, 'params.yaml'),
+          parentPath: buildMetricOrParamPath(ColumnType.PARAMS, 'params.yaml'),
           path: testParamPath,
           pathArray: [ColumnType.PARAMS, 'params.yaml', testParamName],
           type: ColumnType.PARAMS,
@@ -688,6 +695,196 @@ describe('App', () => {
       const contextMenuEvent = createEvent.contextMenu(target)
       fireEvent(target, contextMenuEvent)
       expect(contextMenuEvent.defaultPrevented).toBe(true)
+    })
+  })
+
+  describe('Sort and Filter Indicators', () => {
+    it('should show an indicator with the amount of applied sorts', () => {
+      render(<App />)
+      fireEvent(
+        window,
+        new MessageEvent('message', {
+          data: {
+            data: {
+              ...tableDataFixture,
+              sorts: []
+            },
+            type: MessageToWebviewType.SET_DATA
+          }
+        })
+      )
+      const sortIndicator = screen.getByLabelText('sorts')
+      expect(sortIndicator).toHaveTextContent('')
+
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+
+      fireEvent.mouseEnter(sortIndicator)
+
+      const tooltip = screen.getByRole('tooltip')
+
+      expect(tooltip).toHaveTextContent('No Sorts Applied')
+
+      const { columns } = tableDataFixture
+      const firstSortPath = columns[columns.length - 1].path
+      const secondSortPath = columns[columns.length - 2].path
+      fireEvent(
+        window,
+        new MessageEvent('message', {
+          data: {
+            data: {
+              ...tableDataFixture,
+              sorts: [{ descending: true, path: firstSortPath }]
+            },
+            type: MessageToWebviewType.SET_DATA
+          }
+        })
+      )
+      expect(sortIndicator).toHaveTextContent('1')
+      expect(tooltip).toHaveTextContent('1 Sort Applied')
+      fireEvent(
+        window,
+        new MessageEvent('message', {
+          data: {
+            data: {
+              ...tableDataFixture,
+              sorts: [
+                { descending: true, path: firstSortPath },
+                { descending: false, path: secondSortPath }
+              ]
+            },
+            type: MessageToWebviewType.SET_DATA
+          }
+        })
+      )
+      expect(sortIndicator).toHaveTextContent('2')
+      expect(tooltip).toHaveTextContent('2 Sorts Applied')
+    })
+  })
+
+  it('should show an indicator with the amount of applied filters', () => {
+    render(<App />)
+    fireEvent(
+      window,
+      new MessageEvent('message', {
+        data: {
+          data: {
+            ...tableDataFixture,
+            filters: []
+          },
+          type: MessageToWebviewType.SET_DATA
+        }
+      })
+    )
+    const filterIndicator = screen.getByLabelText('filters')
+    expect(filterIndicator).toHaveTextContent('')
+
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+
+    fireEvent.mouseEnter(filterIndicator)
+
+    const tooltip = screen.getByRole('tooltip')
+
+    expect(tooltip).toHaveTextContent('No Filters Applied')
+
+    const { columns } = tableDataFixture
+    const firstFilterPath = columns[columns.length - 1].path
+    const secondFilterPath = columns[columns.length - 2].path
+    fireEvent(
+      window,
+      new MessageEvent('message', {
+        data: {
+          data: {
+            ...tableDataFixture,
+            filters: [firstFilterPath]
+          },
+          type: MessageToWebviewType.SET_DATA
+        }
+      })
+    )
+    expect(filterIndicator).toHaveTextContent('1')
+    expect(tooltip).toHaveTextContent('1 Filter Applied')
+    expect(tooltip).toHaveTextContent('0 Experiments, 0 Checkpoints Filtered')
+
+    fireEvent(
+      window,
+      new MessageEvent('message', {
+        data: {
+          data: {
+            ...tableDataFixture,
+            filteredCounts: {
+              checkpoints: 2,
+              experiments: 1
+            },
+            filters: [firstFilterPath, secondFilterPath]
+          },
+          type: MessageToWebviewType.SET_DATA
+        }
+      })
+    )
+    expect(filterIndicator).toHaveTextContent('2')
+    expect(tooltip).toHaveTextContent('2 Filters Applied')
+    expect(tooltip).toHaveTextContent('1 Experiment, 2 Checkpoints Filtered')
+
+    fireEvent(
+      window,
+      new MessageEvent('message', {
+        data: {
+          data: {
+            ...tableDataFixture,
+            filteredCounts: {
+              experiments: 10000
+            },
+            filters: [firstFilterPath, secondFilterPath]
+          },
+          type: MessageToWebviewType.SET_DATA
+        }
+      })
+    )
+    expect(filterIndicator).toHaveTextContent('2')
+    expect(tooltip).toHaveTextContent('Experiment')
+    expect(tooltip).not.toHaveTextContent('Checkpoint')
+
+    fireEvent(
+      window,
+      new MessageEvent('message', {
+        data: {
+          data: {
+            ...tableDataFixture,
+            filteredCounts: {
+              checkpoints: 10000,
+              experiments: 10000
+            },
+            filters: []
+          },
+          type: MessageToWebviewType.SET_DATA
+        }
+      })
+    )
+    expect(filterIndicator).toHaveTextContent('')
+    expect(tooltip).not.toHaveTextContent('Experiment')
+    expect(tooltip).not.toHaveTextContent('Checkpoint')
+  })
+
+  it('should send a message to focus the relevant tree when clicked', () => {
+    render(<App />)
+    fireEvent(
+      window,
+      new MessageEvent('message', {
+        data: {
+          data: tableDataFixture,
+          type: MessageToWebviewType.SET_DATA
+        }
+      })
+    )
+    mockPostMessage.mockClear()
+    fireEvent.click(screen.getByLabelText('sorts'))
+    expect(mockPostMessage).toBeCalledWith({
+      type: MessageFromWebviewType.FOCUS_SORTS_TREE
+    })
+    mockPostMessage.mockClear()
+    fireEvent.click(screen.getByLabelText('filters'))
+    expect(mockPostMessage).toBeCalledWith({
+      type: MessageFromWebviewType.FOCUS_FILTERS_TREE
     })
   })
 })

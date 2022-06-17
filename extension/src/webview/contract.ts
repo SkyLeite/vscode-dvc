@@ -14,14 +14,17 @@ export enum MessageFromWebviewType {
   INITIALIZED = 'initialized',
   APPLY_EXPERIMENT_TO_WORKSPACE = 'apply-experiment-to-workspace',
   CREATE_BRANCH_FROM_EXPERIMENT = 'create-branch-from-experiment',
+  FOCUS_FILTERS_TREE = 'focus-filters-tree',
+  FOCUS_SORTS_TREE = 'focus-sorts-tree',
+  OPEN_PARAMS_FILE_TO_THE_SIDE = 'open-params-file-to-the-side',
   REMOVE_COLUMN_SORT = 'remove-column-sort',
   REMOVE_EXPERIMENT = 'remove-experiment',
-  RENAME_SECTION = 'rename-section',
   REORDER_COLUMNS = 'reorder-columns',
   REORDER_PLOTS_COMPARISON = 'reorder-plots-comparison',
   REORDER_PLOTS_METRICS = 'reorder-plots-metrics',
   REORDER_PLOTS_TEMPLATES = 'reorder-plots-templates',
   REFRESH_REVISION = 'refresh-revision',
+  REFRESH_REVISIONS = 'refresh-revisions',
   RESIZE_COLUMN = 'resize-column',
   RESIZE_PLOTS = 'resize-plots',
   SORT_COLUMN = 'sort-column',
@@ -66,6 +69,10 @@ export type MessageFromWebview =
     }
   | {
       type: MessageFromWebviewType.HIDE_EXPERIMENTS_TABLE_COLUMN
+      payload: string
+    }
+  | {
+      type: MessageFromWebviewType.OPEN_PARAMS_FILE_TO_THE_SIDE
       payload: string
     }
   | {
@@ -124,15 +131,14 @@ export type MessageFromWebview =
       type: MessageFromWebviewType.REORDER_PLOTS_TEMPLATES
       payload: PlotsTemplatesReordered
     }
-  | {
-      type: MessageFromWebviewType.RENAME_SECTION
-      payload: PlotSectionRenamedPayload
-    }
   | { type: MessageFromWebviewType.INITIALIZED }
   | { type: MessageFromWebviewType.SELECT_EXPERIMENTS }
   | { type: MessageFromWebviewType.SELECT_PLOTS }
   | { type: MessageFromWebviewType.REFRESH_REVISION; payload: string }
+  | { type: MessageFromWebviewType.REFRESH_REVISIONS; payload: string[] }
   | { type: MessageFromWebviewType.SELECT_COLUMNS }
+  | { type: MessageFromWebviewType.FOCUS_FILTERS_TREE }
+  | { type: MessageFromWebviewType.FOCUS_SORTS_TREE }
 
 export type MessageToWebview<T extends WebviewData> = {
   type: MessageToWebviewType.SET_DATA

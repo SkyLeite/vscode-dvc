@@ -3,8 +3,10 @@ import { Experiment, Column } from 'dvc/src/experiments/webview/contract'
 import React, { useRef } from 'react'
 import { HeaderGroup, TableInstance } from 'react-table'
 import { MessageFromWebviewType } from 'dvc/src/webview/contract'
+import { FilteredCounts } from 'dvc/src/experiments/model/filterBy/collect'
 import styles from './styles.module.scss'
 import { MergedHeaderGroups } from './MergeHeaderGroups'
+import { Indicators } from './Indicators'
 import { useColumnOrder } from '../../hooks/useColumnOrder'
 import { sendMessage } from '../../../shared/vscode'
 import { leafColumnIds, reorderColumnIds } from '../../util/columns'
@@ -17,6 +19,8 @@ interface TableHeadProps {
   instance: TableInstance<Experiment>
   columns: Column[]
   sorts: SortDefinition[]
+  filteredCounts: FilteredCounts
+  filters: string[]
 }
 
 export const TableHead: React.FC<TableHeadProps> = ({
@@ -26,6 +30,8 @@ export const TableHead: React.FC<TableHeadProps> = ({
     state: { columnOrder },
     allColumns
   },
+  filteredCounts,
+  filters,
   columns,
   sorts
 }) => {
@@ -82,6 +88,11 @@ export const TableHead: React.FC<TableHeadProps> = ({
 
   return (
     <div className={styles.thead}>
+      <Indicators
+        sorts={sorts}
+        filters={filters}
+        filteredCounts={filteredCounts}
+      />
       {headerGroups.map(headerGroup => (
         // eslint-disable-next-line react/jsx-key
         <MergedHeaderGroups
@@ -90,6 +101,7 @@ export const TableHead: React.FC<TableHeadProps> = ({
           headerGroup={headerGroup}
           columns={allHeaders}
           sorts={sorts}
+          filters={filters}
           onDragStart={onDragStart}
           onDragUpdate={onDragUpdate}
           onDragEnd={onDragEnd}

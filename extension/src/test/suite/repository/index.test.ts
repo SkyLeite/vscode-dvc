@@ -1,20 +1,16 @@
 import { join, resolve } from 'path'
 import { afterEach, beforeEach, describe, it, suite } from 'mocha'
 import { expect } from 'chai'
-import { restore, spy } from 'sinon'
-import { buildDependencies } from './util'
+import { restore } from 'sinon'
+import { buildDependencies, buildRepository } from './util'
 import { Disposable } from '../../../extension'
 import { dvcDemoPath } from '../../util'
-import { Repository } from '../../../repository'
-import { RepositoryModel } from '../../../repository/model'
 import {
   DiffOutput,
   ListOutput,
   Status,
   StatusOutput
 } from '../../../cli/reader'
-import { SourceControlManagement } from '../../../repository/sourceControlManagement'
-import { DecorationProvider } from '../../../repository/decorationProvider'
 import { bypassProcessManagerDebounce, FIRST_TRUTHY_TIME } from '../util'
 
 suite('Repository Test Suite', () => {
@@ -28,9 +24,6 @@ suite('Repository Test Suite', () => {
     disposable.dispose()
   })
 
-  const emptyState = disposable
-    .track(new RepositoryModel(dvcDemoPath))
-    .getState()
   const emptySet = new Set<string>()
 
   const logDir = 'logs'
@@ -48,6 +41,7 @@ suite('Repository Test Suite', () => {
         internalCommands,
         mockDiff,
         mockGetAllUntracked,
+        mockGetHasChanges,
         mockListDvcOnlyRecursive,
         mockStatus,
         updatesPaused,
@@ -88,16 +82,14 @@ suite('Repository Test Suite', () => {
         resolve(dvcDemoPath, 'some', 'untracked', 'python.py')
       ])
       mockGetAllUntracked.resolves(untracked)
+      mockGetHasChanges.resolves(true)
 
-      const repository = disposable.track(
-        new Repository(
-          dvcDemoPath,
-          internalCommands,
-          updatesPaused,
-          treeDataChanged
-        )
+      const { setDecorationStateSpy, setScmStateSpy } = await buildRepository(
+        disposable,
+        internalCommands,
+        updatesPaused,
+        treeDataChanged
       )
-      await repository.isReady()
 
       const modified = new Set([
         resolve(dvcDemoPath, model),
@@ -116,18 +108,34 @@ suite('Repository Test Suite', () => {
         resolve(dvcDemoPath, MNISTDir)
       ])
 
+      const hasRemote = new Set([
+        resolve(dvcDemoPath, logAcc),
+        resolve(dvcDemoPath, logLoss),
+        resolve(dvcDemoPath, model),
+        resolve(dvcDemoPath, dataDir)
+      ])
+
       expect(mockDiff).to.be.calledWith(dvcDemoPath)
       expect(mockStatus).to.be.calledWith(dvcDemoPath)
       expect(mockGetAllUntracked).to.be.calledWith(dvcDemoPath)
       expect(mockListDvcOnlyRecursive).to.be.calledWith(dvcDemoPath)
-      expect(repository.getState()).to.deep.equal({
+      expect(setDecorationStateSpy.lastCall.firstArg).to.deep.equal({
         added: emptySet,
         deleted: emptySet,
         gitModified: emptySet,
         modified,
         notInCache: emptySet,
         renamed: emptySet,
-        tracked,
+        tracked
+      })
+      expect(setScmStateSpy.lastCall.firstArg).to.deep.equal({
+        added: emptySet,
+        deleted: emptySet,
+        gitModified: emptySet,
+        hasRemote,
+        modified,
+        notInCache: emptySet,
+        renamed: emptySet,
         untracked
       })
     })
@@ -139,6 +147,7 @@ suite('Repository Test Suite', () => {
         internalCommands,
         mockDiff,
         mockGetAllUntracked,
+        mockGetHasChanges,
         mockListDvcOnlyRecursive,
         mockNow,
         mockStatus,
@@ -187,16 +196,15 @@ suite('Repository Test Suite', () => {
           ]
         } as unknown as StatusOutput)
       mockGetAllUntracked.resolves(emptySet)
+      mockGetHasChanges.resolves(false)
 
-      const repository = disposable.track(
-        new Repository(
-          dvcDemoPath,
+      const { repository, setDecorationStateSpy, setScmStateSpy } =
+        await buildRepository(
+          disposable,
           internalCommands,
           updatesPaused,
           treeDataChanged
         )
-      )
-      await repository.isReady()
 
       bypassProcessManagerDebounce(mockNow)
 
@@ -204,7 +212,26 @@ suite('Repository Test Suite', () => {
         disposable.track(onDidChangeTreeData(() => resolve(undefined)))
       )
 
-      expect(repository.getState()).to.deep.equal(emptyState)
+      expect(setDecorationStateSpy.lastCall.firstArg).to.deep.equal({
+        added: emptySet,
+        deleted: emptySet,
+        gitModified: emptySet,
+        modified: emptySet,
+        notInCache: emptySet,
+        renamed: emptySet,
+        tracked: emptySet
+      })
+
+      expect(setScmStateSpy.lastCall.firstArg).to.deep.equal({
+        added: emptySet,
+        deleted: emptySet,
+        gitModified: emptySet,
+        hasRemote: emptySet,
+        modified: emptySet,
+        notInCache: emptySet,
+        renamed: emptySet,
+        untracked: emptySet
+      })
       expect(repository.hasChanges()).to.be.false
 
       await repository.update(join(dvcDemoPath, 'dvc.lock'))
@@ -227,21 +254,40 @@ suite('Repository Test Suite', () => {
         resolve(dvcDemoPath, dataDir),
         resolve(dvcDemoPath, logDir)
       ])
+
+      const hasRemote = new Set([
+        resolve(dvcDemoPath, compressedDataset),
+        resolve(dvcDemoPath, dataset),
+        resolve(dvcDemoPath, logAcc),
+        resolve(dvcDemoPath, logLoss),
+        resolve(dvcDemoPath, model)
+      ])
+
       await dataUpdateEvent
 
       expect(mockDiff).to.be.calledTwice
       expect(mockStatus).to.be.calledTwice
       expect(mockGetAllUntracked).to.be.calledTwice
+      expect(mockGetHasChanges).to.be.calledTwice
       expect(mockListDvcOnlyRecursive).to.be.calledTwice
 
-      expect(repository.getState()).to.deep.equal({
+      expect(setDecorationStateSpy.lastCall.firstArg).to.deep.equal({
         added: emptySet,
         deleted,
         gitModified: emptySet,
         modified: emptySet,
         notInCache: emptySet,
         renamed: emptySet,
-        tracked,
+        tracked
+      })
+      expect(setScmStateSpy.lastCall.firstArg).to.deep.equal({
+        added: emptySet,
+        deleted,
+        gitModified: emptySet,
+        hasRemote,
+        modified: emptySet,
+        notInCache: emptySet,
+        renamed: emptySet,
         untracked: emptySet
       })
       expect(repository.hasChanges()).to.be.true
@@ -263,6 +309,7 @@ suite('Repository Test Suite', () => {
         internalCommands,
         mockDiff,
         mockGetAllUntracked,
+        mockGetHasChanges,
         mockListDvcOnlyRecursive,
         mockNow,
         mockStatus,
@@ -329,29 +376,43 @@ suite('Repository Test Suite', () => {
         .resolves(emptySet)
         .onSecondCall()
         .resolves(untracked)
+      mockGetHasChanges.resolves(false)
 
-      const repository = disposable.track(
-        new Repository(
-          dvcDemoPath,
+      const { repository, setDecorationStateSpy, setScmStateSpy } =
+        await buildRepository(
+          disposable,
           internalCommands,
           updatesPaused,
           treeDataChanged
         )
-      )
-      await repository.isReady()
 
       bypassProcessManagerDebounce(mockNow)
 
       const dataUpdateEvent = new Promise(resolve =>
         disposable.track(onDidChangeTreeData(() => resolve(undefined)))
       )
-      const setDecorationStateSpy = spy(
-        DecorationProvider.prototype,
-        'setState'
-      )
-      const setScmStateSpy = spy(SourceControlManagement.prototype, 'setState')
 
-      expect(repository.getState()).to.deep.equal(emptyState)
+      expect(setDecorationStateSpy.lastCall.firstArg).to.deep.equal({
+        added: emptySet,
+        deleted: emptySet,
+        gitModified: emptySet,
+        modified: emptySet,
+        notInCache: emptySet,
+        renamed: emptySet,
+        tracked: emptySet
+      })
+
+      expect(setScmStateSpy.lastCall.firstArg).to.deep.equal({
+        added: emptySet,
+        deleted: emptySet,
+        gitModified: emptySet,
+        hasRemote: emptySet,
+        modified: emptySet,
+        notInCache: emptySet,
+        renamed: emptySet,
+        untracked: emptySet
+      })
+
       expect(repository.hasChanges()).to.be.false
 
       await repository.update(join(dvcDemoPath, 'dvc.lock'))
@@ -373,29 +434,41 @@ suite('Repository Test Suite', () => {
         resolve(dvcDemoPath, model),
         resolve(dvcDemoPath, prepared)
       ])
+      const hasRemote = new Set([
+        resolve(dvcDemoPath, logAcc),
+        resolve(dvcDemoPath, logLoss),
+        resolve(dvcDemoPath, model),
+        resolve(dvcDemoPath, dataDir),
+        resolve(dvcDemoPath, features),
+        resolve(dvcDemoPath, dataXml),
+        resolve(dvcDemoPath, prepared)
+      ])
 
       expect(mockDiff).to.be.calledTwice
       expect(mockStatus).to.be.calledTwice
       expect(mockGetAllUntracked).to.be.calledTwice
+      expect(mockGetHasChanges).to.be.calledTwice
       expect(mockListDvcOnlyRecursive).to.be.calledTwice
 
-      expect(repository.getState()).to.deep.equal({
+      expect(setDecorationStateSpy.lastCall.firstArg).to.deep.equal({
         added: emptySet,
         deleted,
         gitModified: emptySet,
         modified,
         notInCache,
         renamed: emptySet,
-        tracked,
+        tracked
+      })
+      expect(setScmStateSpy.lastCall.firstArg).to.deep.equal({
+        added: emptySet,
+        deleted,
+        gitModified: emptySet,
+        hasRemote,
+        modified,
+        notInCache,
+        renamed: emptySet,
         untracked
       })
-
-      expect(...setDecorationStateSpy.lastCall.args).to.deep.equal(
-        repository.getState()
-      )
-      expect(...setScmStateSpy.lastCall.args).to.deep.equal(
-        repository.getState()
-      )
       expect(repository.hasChanges()).to.be.true
     })
   })
